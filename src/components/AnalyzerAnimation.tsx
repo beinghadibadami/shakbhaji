@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { CircleNotch } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 interface AnalyzerAnimationProps {
   isAnalyzing: boolean;
@@ -93,7 +93,7 @@ const AnalyzerAnimation: React.FC<AnalyzerAnimationProps> = ({ isAnalyzing }) =>
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <CircleNotch size={28} className="animate-spin-slow text-primary" />
+          <Loader2 size={28} className="animate-spin-slow text-primary" />
         </div>
       </div>
       
