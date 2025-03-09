@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -64,13 +63,10 @@ const Index = () => {
         analysisResult = await analyzeImageUrl(selectedUrl);
       }
 
-      // Delay to allow animation to show (in real app, will depend on actual API)
-      setTimeout(() => {
-        if (analysisResult) {
-          setResult(analysisResult);
-        }
-        setIsAnalyzing(false);
-      }, 3000);
+      if (analysisResult) {
+        setResult(analysisResult);
+      }
+      setIsAnalyzing(false);
     } catch (error) {
       console.error("Analysis error:", error);
       toast({
@@ -87,28 +83,6 @@ const Index = () => {
     setSelectedUrl(null);
     setPreviewUrl(null);
     setResult(null);
-  }, []);
-
-  // For demo: mock data when backend isn't available
-  const handleMockAnalyze = useCallback(() => {
-    setIsAnalyzing(true);
-    setResult(null);
-
-    // Simulate API delay
-    setTimeout(() => {
-      const mockResult = {
-        name: "Apple",
-        quality: 87,
-        moisture: 74,
-        size: "medium",
-        insight: "This apple appears to be a fresh, ripe specimen with excellent coloration and minimal blemishes. The skin has a healthy sheen, indicating good hydration levels. The size is typical for the variety, and there are no visible signs of bruising or damage.",
-        price: "₹110",
-        quantity: "1 kg"
-      };
-      
-      setResult(mockResult);
-      setIsAnalyzing(false);
-    }, 3000);
   }, []);
 
   return (
@@ -173,7 +147,7 @@ const Index = () => {
             
             {previewUrl && !result && !isAnalyzing && (
               <div className="flex justify-center mt-6 animate-fade-in">
-                <Button size="lg" onClick={handleMockAnalyze}>
+                <Button size="lg" onClick={handleAnalyze}>
                   Analyze Now
                 </Button>
               </div>

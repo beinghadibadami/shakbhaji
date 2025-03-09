@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,9 +8,15 @@ interface UploadSectionProps {
   onImageSelected: (file: File) => void;
   onUrlSubmit: (url: string) => void;
   isLoading: boolean;
+  onAnalyze?: () => void;
 }
 
-const UploadSection: React.FC<UploadSectionProps> = ({ onImageSelected, onUrlSubmit, isLoading }) => {
+const UploadSection: React.FC<UploadSectionProps> = ({ 
+  onImageSelected, 
+  onUrlSubmit, 
+  isLoading,
+  onAnalyze 
+}) => {
   const [dragActive, setDragActive] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState('');
@@ -216,9 +221,9 @@ const UploadSection: React.FC<UploadSectionProps> = ({ onImageSelected, onUrlSub
             >
               <X size={16} />
             </button>
-            {!isLoading && (
+            {!isLoading && onAnalyze && (
               <div className="absolute bottom-4 right-4">
-                <Button variant="default" onClick={() => {}} className="rounded-full px-4 py-2">
+                <Button variant="default" onClick={onAnalyze} className="rounded-full px-4 py-2">
                   <span className="mr-2">Analyze</span>
                   <ChevronRight size={16} />
                 </Button>
