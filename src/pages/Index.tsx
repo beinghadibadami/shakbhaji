@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -63,10 +64,13 @@ const Index = () => {
         analysisResult = await analyzeImageUrl(selectedUrl);
       }
 
-      if (analysisResult) {
-        setResult(analysisResult);
-      }
-      setIsAnalyzing(false);
+      // Add a short delay to show the analysis animation
+      setTimeout(() => {
+        if (analysisResult) {
+          setResult(analysisResult);
+        }
+        setIsAnalyzing(false);
+      }, 1500);
     } catch (error) {
       console.error("Analysis error:", error);
       toast({
