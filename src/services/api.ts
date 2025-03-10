@@ -1,4 +1,3 @@
-
 interface AnalysisResult {
   name: string;
   quality: number;
@@ -20,93 +19,90 @@ export async function analyzeImage(file: File): Promise<AnalysisResult> {
     const formData = new FormData();
     formData.append('file', file);
 
-    // Mock response for development/demo when API is unavailable
-    // In production environment, remove this mock and use only the real API
-    try {
-      const response = await fetch('http://localhost:8000/analyze/upload', {
-        method: 'POST',
-        body: formData,
-      });
+    // Add CORS headers and proper content type
+    const response = await fetch('http://localhost:8000/analyze/upload', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Accept': 'application/json',
+      },
+      // Add mode and credentials for CORS
+      mode: 'cors',
+      credentials: 'same-origin',
+    });
 
-      if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error analyzing image:', error);
-      
-      // Return mock data as fallback when API is unavailable
-      console.log('Using mock data as fallback');
-      return getMockAnalysisResult();
+    if (!response.ok) {
+      console.error('API Error:', response.status, response.statusText);
+      throw new Error(`API Error: ${response.status}`);
     }
+
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error('Error analyzing image:', error);
-    throw error;
+    // Return mock data as fallback when API is unavailable
+    console.log('Using mock data as fallback');
+    return getMockAnalysisResult();
   }
 }
 
 export async function analyzeImageUrl(imageUrl: string): Promise<AnalysisResult> {
   try {
-    // Mock response for development/demo when API is unavailable
-    // In production environment, remove this mock and use only the real API
-    try {
-      const response = await fetch('http://localhost:8000/analyze/url', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ image_url: imageUrl }),
-      });
+    const response = await fetch('http://localhost:8000/analyze/url', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({ image_url: imageUrl }),
+      // Add mode and credentials for CORS
+      mode: 'cors',
+      credentials: 'same-origin',
+    });
 
-      if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error analyzing image URL:', error);
-      
-      // Return mock data as fallback when API is unavailable
-      console.log('Using mock data as fallback');
-      return getMockAnalysisResult();
+    if (!response.ok) {
+      console.error('API Error:', response.status, response.statusText);
+      throw new Error(`API Error: ${response.status}`);
     }
+
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error('Error analyzing image URL:', error);
-    throw error;
+    // Return mock data as fallback when API is unavailable
+    console.log('Using mock data as fallback');
+    return getMockAnalysisResult();
   }
 }
 
 export async function getProductPrice(productName: string): Promise<{ price: string; quantity: string }> {
   try {
-    // Mock response for development/demo when API is unavailable
-    // In production environment, remove this mock and use only the real API
-    try {
-      const response = await fetch(`http://localhost:8000/price/${encodeURIComponent(productName)}`);
+    const response = await fetch(`http://localhost:8000/price/${encodeURIComponent(productName)}`, {
+      headers: {
+        'Accept': 'application/json',
+      },
+      // Add mode and credentials for CORS
+      mode: 'cors',
+      credentials: 'same-origin',
+    });
 
-      if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return {
-        price: data.price,
-        quantity: data.quantity,
-      };
-    } catch (error) {
-      console.error('Error getting product price:', error);
-      
-      // Return mock data as fallback when API is unavailable
-      return {
-        price: "₹110",
-        quantity: "1 kg"
-      };
+    if (!response.ok) {
+      console.error('API Error:', response.status, response.statusText);
+      throw new Error(`API Error: ${response.status}`);
     }
+
+    const data = await response.json();
+    return {
+      price: data.price,
+      quantity: data.quantity,
+    };
   } catch (error) {
     console.error('Error getting product price:', error);
-    throw error;
+    // Return mock data as fallback when API is unavailable
+    return {
+      price: "₹110",
+      quantity: "1 kg"
+    };
   }
 }
 
