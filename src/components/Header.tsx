@@ -7,7 +7,7 @@ const Header: React.FC = () => {
   const location = useLocation();
   
   return (
-    <header className="w-full py-6">
+    <header className="w-full py-6 z-10 relative">
       <div className="container px-4 mx-auto">
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 group">
@@ -30,20 +30,14 @@ const Header: React.FC = () => {
             >
               About
             </Link>
-            <Link to="/pricing" className="text-sm font-medium hover:text-primary transition-colors">
-              Pricing
-            </Link>
-            <Link to="/contact" className="text-sm font-medium hover:text-primary transition-colors">
-              Contact
-            </Link>
           </nav>
           
           <div className="flex items-center gap-3">
             <Link 
-              to="/api" 
+              to="/#analyzer" 
               className="hidden md:flex items-center gap-1 text-sm font-medium text-primary hover:underline"
             >
-              <span>API Docs</span>
+              <span>Try Now</span>
               <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
