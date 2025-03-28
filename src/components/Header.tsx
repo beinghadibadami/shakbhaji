@@ -1,9 +1,11 @@
 
 import React from 'react';
 import { Leaf, ChevronRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 const Header: React.FC = () => {
+  const location = useLocation();
+  
   return (
     <header className="w-full py-6">
       <div className="container px-4 mx-auto">
@@ -16,10 +18,16 @@ const Header: React.FC = () => {
           </Link>
           
           <nav className="hidden md:flex items-center gap-8">
-            <Link to="/" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link 
+              to="/" 
+              className={`text-sm font-medium transition-colors ${location.pathname === '/' ? 'text-primary' : 'hover:text-primary'}`}
+            >
               Home
             </Link>
-            <Link to="/about" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link 
+              to="/about" 
+              className={`text-sm font-medium transition-colors ${location.pathname === '/about' ? 'text-primary' : 'hover:text-primary'}`}
+            >
               About
             </Link>
             <Link to="/pricing" className="text-sm font-medium hover:text-primary transition-colors">

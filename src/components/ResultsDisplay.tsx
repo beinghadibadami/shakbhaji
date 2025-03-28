@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, Leaf } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface AnalysisResult {
   name: string;
@@ -22,6 +23,8 @@ interface ResultsDisplayProps {
 }
 
 const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, imageUrl, onReset }) => {
+  const { toast } = useToast();
+  
   if (!result) return null;
 
   const getQualityColor = (quality: number) => {
@@ -51,6 +54,55 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, imageUrl, onRes
         return <div className="w-4 h-4 bg-gray-700 rounded-full"></div>;
       default:
         return <div className="w-3 h-3 bg-gray-600 rounded-full"></div>;
+    }
+  };
+
+  const handleSaveReport = () => {
+    if (!result) return;
+
+    try {
+      // Create report text content
+      const reportContent = `
+VegVision Analysis Report
+------------------------
+Product: ${result.name}
+Quality Score: ${result.quality}%
+Moisture Content: ${result.moisture}%
+Size: ${result.size}
+${result.price && result.quantity ? `Current Price: ${result.price} for ${result.quantity}` : ''}
+
+Analysis Insight:
+${result.insight}
+
+Report generated on: ${new Date().toLocaleString()}
+      `;
+
+      // Create a Blob containing the report text
+      const blob = new Blob([reportContent], { type: 'text/plain' });
+      
+      // Create download link and trigger download
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${result.name.toLowerCase().replace(/\s+/g, '-')}-analysis-report.txt`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Report saved",
+        description: "Your analysis report has been downloaded.",
+      });
+    } catch (error) {
+      console.error("Error saving report:", error);
+      toast({
+        title: "Error saving report",
+        description: "There was a problem saving your report. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -147,7 +199,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, imageUrl, onRes
               </div>
               
               <div className="pt-2">
-                <Button variant="outline" className="w-full" size="sm">
+                <Button variant="outline" className="w-full" size="sm" onClick={handleSaveReport}>
                   <Download className="mr-2 h-4 w-4" />
                   <span>Save Report</span>
                 </Button>

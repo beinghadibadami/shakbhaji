@@ -2,6 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import UploadSection from "@/components/UploadSection";
@@ -118,9 +119,11 @@ const Index = () => {
                 <Button size="lg" onClick={() => document.getElementById('analyzer')?.scrollIntoView({ behavior: 'smooth' })}>
                   Try It Now
                 </Button>
-                <Button size="lg" variant="outline">
-                  Learn More
-                </Button>
+                <Link to="/about">
+                  <Button size="lg" variant="outline">
+                    Learn More
+                  </Button>
+                </Link>
               </div>
             </div>
             
