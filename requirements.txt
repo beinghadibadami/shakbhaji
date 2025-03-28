@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+groq
+requests
+pydantic
+selenium
+beautifulsoup4
+pymongo
