@@ -1,6 +1,7 @@
 # 🥦 AI-Powered Fruit & Vegetable Analysis App 🍎
 
 An AI-driven application that analyzes images of fruits and vegetables to provide insights such as:
+
 ✅ Moisture Content 💧  
 ✅ Quality Score ⭐  
 ✅ Current Market Price (Scraped from BigBasket) 💰  
@@ -10,6 +11,7 @@ An AI-driven application that analyzes images of fruits and vegetables to provid
 ## 🚀 Features
 - AI-based image analysis 📸
 - Real-time price fetching from BigBasket 🛒
+- LLM Integration 🚀
 - Next.js frontend ⚛️
 - FastAPI backend ⚡
 
