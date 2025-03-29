@@ -69,6 +69,17 @@ Backend will be live at: `http://127.0.0.1:8000`
 
 ---
 
+🔹 Database Setup (MongoDB)
+
+1️⃣ Install [MongoDB](https://www.mongodb.com/try/download/community) if not installed 🗄️ 
+
+2️⃣ Start the MongoDB server 📡 
+```sh 
+mongod --dbpath <your-db-path> 
+``` 
+3️⃣ Ensure MongoDB is running before starting the backend ✅
+
+---
 ## 📌 Contributing
 Feel free to fork the repo, raise issues, or submit pull requests! 🤝
 
