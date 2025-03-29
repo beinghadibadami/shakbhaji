@@ -1,69 +1,76 @@
-# Welcome to your Lovable project
+# 🥦 AI-Powered Fruit & Vegetable Analysis App 🍎
 
-## Project info
+An AI-driven application that analyzes images of fruits and vegetables to provide insights such as:
+✅ Moisture Content 💧  
+✅ Quality Score ⭐  
+✅ Current Market Price (Scraped from BigBasket) 💰  
 
-**URL**: https://lovable.dev/projects/6391970b-9a1a-4cfc-b206-c076b5632ae2
+---
 
-## How can I edit this code?
+## 🚀 Features
+- AI-based image analysis 📸
+- Real-time price fetching from BigBasket 🛒
+- Next.js frontend ⚛️
+- FastAPI backend ⚡
 
-There are several ways of editing your application.
+---
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/6391970b-9a1a-4cfc-b206-c076b5632ae2) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
+## 📂 Clone the Repository
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+git clone https://github.com/beinghadibadami/shakbhaji.git
+cd shakbhaji
 ```
 
-**Edit a file directly in GitHub**
+---
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 🏗️ Setup Instructions
 
-**Use GitHub Codespaces**
+### 🔹 Frontend (Next.js)
+1️⃣ Install [Node.js](https://nodejs.org/) (if not installed) 🛠️
+2️⃣ Navigate to the frontend folder 📂
+```sh
+cd frontend
+```
+3️⃣ Install dependencies 📦
+```sh
+npm install
+```
+4️⃣ Run the development server 🚀
+```sh
+npm run dev
+```
+Frontend will be live at: `http://localhost:3000`
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+---
 
-## What technologies are used for this project?
+### 🔹 Backend (FastAPI)
+1️⃣ Install Python (if not installed) 🐍
+2️⃣ Create and activate a virtual environment 🏗️
+```sh
+python -m venv venv  # Create virtual environment
+source venv/bin/activate  # On macOS/Linux
+venv\Scripts\activate  # On Windows
+```
+3️⃣ Navigate to the backend folder 📂
+```sh
+cd backend
+```
+4️⃣ Install dependencies 📦
+```sh
+pip install -r requirements.txt
+```
+5️⃣ Run the FastAPI server 🚀
+```sh
+uvicorn app:app --reload
+```
+Backend will be live at: `http://127.0.0.1:8000`
 
-This project is built with .
+---
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 📌 Contributing
+Feel free to fork the repo, raise issues, or submit pull requests! 🤝
 
-## How can I deploy this project?
+---
 
-Simply open [Lovable](https://lovable.dev/projects/6391970b-9a1a-4cfc-b206-c076b5632ae2) and click on Share -> Publish.
+### 🌟 Star the repo if you like it! ⭐
 
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
