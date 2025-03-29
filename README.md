@@ -61,9 +61,14 @@ cd backend
 ```sh
 pip install -r requirements.txt
 ```
-5️⃣ Run the FastAPI server 🚀
+5️⃣ Get a free API key from [Groq Cloud](https://groq.com/) and add it to your environment variables 🔑
 ```sh
-uvicorn app:app --reload
+export GROQ_API_KEY='your_api_key_here'  # On macOS/Linux
+set GROQ_API_KEY='your_api_key_here'  # On Windows
+```
+6️⃣ Run the FastAPI server 🚀
+```sh
+uvicorn main:app --reload
 ```
 Backend will be live at: `http://127.0.0.1:8000`
 
