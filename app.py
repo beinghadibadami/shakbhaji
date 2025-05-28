@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Query
 from fastapi.responses import JSONResponse
 from groq import Groq
@@ -26,8 +27,6 @@ origins = [
     # "http://localhost:8080",  # Add your deployed frontend URL here
 ]
 
-
-
 # Initialize FastAPI app
 app = FastAPI(
     title="Fruit and Vegetable Analysis API",
@@ -43,7 +42,6 @@ app.add_middleware(
     allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],  # Allow all headers
 )
-
 
 # MongoDB setup
 client = MongoClient('mongodb://localhost:27017/')
@@ -195,7 +193,7 @@ def analyze_image(image_data, force_refresh=False):
     try:
         # Create the completion request
         completion = client.chat.completions.create(
-            model="llama-3.2-90b-vision-preview",
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
             messages=[
                 {
                     "role": "user",
