@@ -10,21 +10,23 @@ from io import BytesIO
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import uvicorn
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 from pymongo import MongoClient
 from datetime import datetime, timedelta
 from fastapi.middleware.cors import CORSMiddleware
+import asyncio
 
-# Define allowed origins (adjust this according to your needs)
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
+# Define allowed origins for CORS
 origins = [
-    "http://localhost:8080",  # Example: your React app running locally
-    # "http://localhost:8080",  # Add your deployed frontend URL here
+    "http://localhost:3000",
+    "http://localhost:8080", 
+    "https://your-frontend-domain.com",  # Replace with your actual frontend domain
+    "*"  # Remove this in production and add specific domains
 ]
 
 # Initialize FastAPI app
@@ -34,19 +36,29 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Add CORS middleware to FastAPI
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # Domains allowed to make requests
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# MongoDB setup
-client = MongoClient('mongodb://localhost:27017/')
-db = client['scraper_db']
-collection = db['fruits_veggies']
+# MongoDB setup - Use environment variable for connection string
+MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017/")
+try:
+    client = MongoClient(MONGODB_URL)
+    db = client['scraper_db']
+    collection = db['fruits_veggies']
+    # Test connection
+    client.admin.command('ping')
+    print("✅ MongoDB connection successful")
+except Exception as e:
+    print(f"❌ MongoDB connection failed: {e}")
+    client = None
+    db = None
+    collection = None
 
 # Pydantic models
 class ImageUrlInput(BaseModel):
@@ -65,14 +77,102 @@ def download_image(url):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to download image: {str(e)}")
 
-# BigBasket scraper function - simplified to just return price and quantity
-def get_product_price(product_name, force_refresh=False):
-    # Convert product name to lowercase for consistency
+# Updated scraper function using Playwright
+async def scrape_bigbasket_playwright(search_query):
+    """Scrape BigBasket using Playwright for cloud deployment compatibility"""
+    url = f"https://www.bigbasket.com/ps/?q={search_query}"
+    print(f"[INFO] Fetching data from: {url}")
+    
+    try:
+        async with async_playwright() as p:
+            # Launch browser with cloud-friendly settings
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    '--no-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--disable-web-security',
+                    '--disable-extensions',
+                    '--no-first-run',
+                    '--disable-default-apps'
+                ]
+            )
+            
+            context = await browser.new_context(
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36'
+            )
+            page = await context.new_page()
+            
+            # Navigate to the page
+            await page.goto(url, wait_until='networkidle', timeout=30000)
+            
+            # Wait for product grid to load
+            await page.wait_for_selector('.mt-5.grid.gap-6.grid-cols-9', timeout=10000)
+            
+            # Get page content
+            content = await page.content()
+            
+            # Close browser
+            await browser.close()
+            
+            # Parse with BeautifulSoup
+            soup = BeautifulSoup(content, 'html.parser')
+            ul_tag = soup.find('ul', class_='mt-5 grid gap-6 grid-cols-9')
+            
+            if ul_tag:
+                print("[INFO] Found product grid")
+                first_item = ul_tag.find('li')
+                
+                if first_item:
+                    # Extract quantity
+                    quantity = "N/A"
+                    quantity_span = first_item.find('span', class_='Label-sc-15v1nk5-0 PackChanger___StyledLabel-sc-newjpv-1 gJxZPQ cWbtUx') or \
+                                   first_item.find('span', class_='Label-sc-15v1nk5-0 gJxZPQ truncate')
+                    if quantity_span:
+                        quantity = quantity_span.get_text(strip=True)
+                    
+                    # Extract price
+                    price = "N/A"
+                    price_span = first_item.find('span', class_='Label-sc-15v1nk5-0 Pricing___StyledLabel-sc-pldi2d-1 gJxZPQ AypOi')
+                    if price_span:
+                        price = price_span.get_text(strip=True)
+                    
+                    # Store in MongoDB if available
+                    if collection:
+                        scraped_data = {
+                            "name": search_query.capitalize(),
+                            "quantity": quantity,
+                            "price": price,
+                            "scraped_at": datetime.utcnow(),
+                            "source_url": url
+                        }
+                        collection.update_one(
+                            {"name": search_query.capitalize()},
+                            {"$set": scraped_data},
+                            upsert=True
+                        )
+                        print(f"[INFO] Updated MongoDB: {scraped_data}")
+                    
+                    return {"price": price, "quantity": quantity}
+                else:
+                    print("[WARNING] No product found.")
+                    return {"price": "N/A", "quantity": "N/A"}
+            else:
+                print("[WARNING] Product grid not found.")
+                return {"price": "N/A", "quantity": "N/A"}
+                
+    except Exception as e:
+        print(f"[ERROR] Playwright scraping failed: {str(e)}")
+        return {"price": "N/A", "quantity": "N/A"}
+
+# Updated price fetching function
+async def get_product_price(product_name, force_refresh=False):
+    """Get product price with caching"""
     product_name_normalized = product_name.lower()
     
-    # Check if we have recent data in MongoDB
-    if not force_refresh:
-        # Look for data less than 24 hours old
+    # Check cache if MongoDB is available
+    if collection and not force_refresh:
         cache_cutoff = datetime.utcnow() - timedelta(hours=24)
         cached_product = collection.find_one({
             "name": product_name_normalized.capitalize(),
@@ -85,106 +185,16 @@ def get_product_price(product_name, force_refresh=False):
                 "quantity": cached_product["quantity"]
             }
     
-    # If no recent data or force_refresh, scrape new data
-    return scrape_bigbasket(product_name_normalized)
-
-def scrape_bigbasket(search_query):
-    url = f"https://www.bigbasket.com/ps/?q={search_query}"
-    print(f"[INFO] Fetching data from: {url}")
-    
-    # Set up Chrome options for headless mode
-    chrome_options = Options()
-    chrome_options.add_argument("--headless=new")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36")
-    
-    # Initialize WebDriver
-    service = Service("C:/WebDrivers/chromedriver-win64/chromedriver.exe")
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    
-    try:
-        driver.get(url)
-        
-        # Wait for product grid to load
-        wait = WebDriverWait(driver, 10)
-        wait.until(EC.presence_of_element_located((By.CLASS_NAME, "mt-5.grid.gap-6.grid-cols-9")))
-        
-        # Parse page source with BeautifulSoup
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-        ul_tag = soup.find('ul', class_='mt-5 grid gap-6 grid-cols-9')
-        
-        if ul_tag:
-            print("[INFO] Found product grid")
-            first_item = ul_tag.find('li')
-            
-            if first_item:
-                # Extract quantity
-                quantity = "N/A"
-                quantity_span = first_item.find('span', class_='Label-sc-15v1nk5-0 PackChanger___StyledLabel-sc-newjpv-1 gJxZPQ cWbtUx') or \
-                               first_item.find('span', class_='Label-sc-15v1nk5-0 gJxZPQ truncate')
-                if quantity_span:
-                    quantity = quantity_span.get_text(strip=True)
-                
-                # Extract price
-                price = "N/A"
-                price_span = first_item.find('span', class_='Label-sc-15v1nk5-0 Pricing___StyledLabel-sc-pldi2d-1 gJxZPQ AypOi')
-                if price_span:
-                    price = price_span.get_text(strip=True)
-                
-                # Prepare document for MongoDB
-                scraped_data = {
-                    "name": search_query.capitalize(),
-                    "quantity": quantity,
-                    "price": price,
-                    "scraped_at": datetime.utcnow(),
-                    "source_url": url
-                }
-                
-                # Insert or update in MongoDB
-                collection.update_one(
-                    {"name": search_query.capitalize()},
-                    {"$set": scraped_data},
-                    upsert=True
-                )
-                print(f"[INFO] Updated MongoDB: {scraped_data}")
-                
-                # Return only price and quantity
-                return {
-                    "price": price,
-                    "quantity": quantity
-                }
-            else:
-                print("[WARNING] No product found.")
-                return {
-                    "price": "N/A",
-                    "quantity": "N/A"
-                }
-        else:
-            print("[WARNING] Product grid not found.")
-            return {
-                "price": "N/A",
-                "quantity": "N/A"
-            }
-            
-    except Exception as e:
-        print(f"[ERROR] An error occurred: {str(e)}")
-        return {
-            "price": "N/A",
-            "quantity": "N/A"
-        }
-    finally:
-        driver.quit()
+    # Scrape new data
+    return await scrape_bigbasket_playwright(product_name_normalized)
 
 # Main analysis function
-def analyze_image(image_data, force_refresh=False):
-    # Convert image data to base64
+async def analyze_image(image_data, force_refresh=False):
+    """Analyze image using Groq API and fetch price data"""
     base64_img = encode_image(image_data)
     
-    # Initialize Groq client with API key
-    api_key = os.environ.get("GROQ_API_KEY")
+    # Get API key from environment
+    api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="GROQ_API_KEY environment variable not set")
     
@@ -224,10 +234,7 @@ def analyze_image(image_data, force_refresh=False):
         
         # Fetch price information if it's a fruit or vegetable
         if "name" in analysis_result and analysis_result["name"] not in ["not a fruit or vegetable", "unknown"]:
-            # Get just price and quantity
-            price_info = get_product_price(analysis_result["name"], force_refresh)
-            
-            # Add price and quantity directly to the analysis result
+            price_info = await get_product_price(analysis_result["name"], force_refresh)
             analysis_result["price"] = price_info["price"]
             analysis_result["quantity"] = price_info["quantity"]
         
@@ -236,59 +243,69 @@ def analyze_image(image_data, force_refresh=False):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
-# Endpoint for file upload
+# API Endpoints
 @app.post("/analyze/upload", response_class=JSONResponse)
 async def analyze_upload(
     file: UploadFile = File(...),
     force_refresh: bool = Query(False, description="Force a new price scrape instead of using cached data")
 ):
-    # Check if file is an image
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Uploaded file is not an image")
     
-    # Read file content
     image_data = await file.read()
-    
-    # Analyze the image and get price data integrated
-    result = analyze_image(image_data, force_refresh)
-    
+    result = await analyze_image(image_data, force_refresh)
     return JSONResponse(content=result)
 
-# Endpoint for URL input
 @app.post("/analyze/url", response_class=JSONResponse)
 async def analyze_url(
     input_data: ImageUrlInput,
     force_refresh: bool = Query(False, description="Force a new price scrape instead of using cached data")
 ):
-    # Download image from URL
     image_data = download_image(input_data.image_url)
-    
-    # Analyze the image and get price data integrated
-    result = analyze_image(image_data, force_refresh)
-    
+    result = await analyze_image(image_data, force_refresh)
     return JSONResponse(content=result)
 
-# Standalone price endpoint
 @app.get("/price/{product_name}", response_class=JSONResponse)
 async def get_price_endpoint(
     product_name: str,
     force_refresh: bool = Query(False, description="Force a new scrape instead of using cached data")
 ):
-    price_info = get_product_price(product_name, force_refresh)
+    price_info = await get_product_price(product_name, force_refresh)
     return JSONResponse(content={"name": product_name.capitalize(), **price_info})
 
-# Root endpoint
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for deployment"""
+    return {
+        "status": "healthy",
+        "mongodb": "connected" if collection else "disconnected",
+        "groq_api": "configured" if os.getenv("GROQ_API_KEY") else "not configured"
+    }
+
 @app.get("/")
 async def root():
     return {
         "message": "Fruit and Vegetable Analysis API",
+        "status": "running",
         "endpoints": {
             "analyze_upload": "/analyze/upload - Upload an image for complete analysis including price",
             "analyze_url": "/analyze/url - Provide an image URL for complete analysis including price",
-            "get_price": "/price/{product_name} - Get only price information for a product"
+            "get_price": "/price/{product_name} - Get only price information for a product",
+            "health": "/health - Health check endpoint"
         }
     }
 
-# Run the application
+# Startup event to install Playwright browsers
+@app.on_event("startup")
+async def startup_event():
+    """Install Playwright browsers on startup (for cloud deployment)"""
+    try:
+        import subprocess
+        subprocess.run(["playwright", "install", "chromium"], check=True)
+        print("✅ Playwright browsers installed successfully")
+    except Exception as e:
+        print(f"⚠️ Failed to install Playwright browsers: {e}")
+
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=False)
