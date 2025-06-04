@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# .gitignore
+.env                # Single .env file
+.env*               # All .env files (e.g., .env.local, .env.prod)
+*.env               # Alternative syntax
+.env/               # Folders named .env
