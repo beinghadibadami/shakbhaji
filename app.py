@@ -95,7 +95,7 @@ async def scrape_bigbasket(search_query):
         await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
         
         # 2. Wait for container hierarchy
-        await page.wait_for_selector("body #__next", state="attached", timeout=15000)
+        # await page.wait_for_selector("body #__next", state="attached", timeout=15000)
         
         # 3. Drill down through containers
         container_selector = """
