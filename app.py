@@ -85,7 +85,6 @@ async def scrape_bigbasket(search_query):
         playwright = await async_playwright().start()
         browser = await playwright.chromium.launch(
             headless=True,
-            channel="chrome",
             args=["--start-maximized"]
         )
         context = await browser.new_context(
