@@ -1,17 +1,17 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 # Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies for Playwright
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     wget \
-    gnupg \
     curl \
+    gnupg \
     unzip \
     fonts-liberation \
     libasound2 \
@@ -27,23 +27,24 @@ RUN apt-get update && apt-get install -y \
     libxdamage1 \
     libxrandr2 \
     xdg-utils \
-    --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
+    libu2f-udev \
+    libvulkan1 \
+    libgbm1 \
+    libgtk-3-0 \
+    && apt-get clean
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Install Playwright and Chrome
-RUN pip install playwright
-RUN playwright install --with-deps
-RUN playwright install chrome
+# Install Playwright browsers (including Chromium for channel="chrome")
+RUN playwright install --with-deps && playwright install chrome
 
-# Copy project files
+# Copy app source code
 COPY . .
 
 # Expose port
 EXPOSE 8000
 
-# Command to run your app
+# Run the application
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
