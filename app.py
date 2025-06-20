@@ -92,14 +92,14 @@ async def scrape_bigbasket(search_query):
         )
 
         page = await context.new_page()
-        page.set_default_timeout(60000)  # Set default timeout
+        page.set_default_timeout(10000)  # Set default timeout
 
         search_url = f"https://www.bigbasket.com/ps/?q={search_query.replace(' ', '+')}"
 
         for attempt in range(2):
             try:
                 print(f"🔎 Navigating to {search_url} (Attempt {attempt + 1})")
-                await page.goto(search_url, wait_until="networkidle", timeout=90000)
+                await page.goto(search_url, wait_until="networkidle", timeout=3000)
 
                 await page.screenshot(path="debug.png", full_page=True)
                 html_content = await page.content()
@@ -107,7 +107,7 @@ async def scrape_bigbasket(search_query):
 
                 # Simplified and reliable product grid selector
                 ul_selector = "ul.mt-5.grid.gap-6.grid-cols-9"
-                await page.wait_for_selector(ul_selector, timeout=45000)
+                await page.wait_for_selector(ul_selector, timeout=5000)
 
                 first_item = await page.query_selector(f"{ul_selector} li")
                 if not first_item:
