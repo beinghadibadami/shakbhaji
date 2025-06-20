@@ -3,7 +3,7 @@ uvicorn[standard]
 groq
 requests
 pydantic
-playwright
+selenium
 beautifulsoup4
 pymongo
 python-dotenv
