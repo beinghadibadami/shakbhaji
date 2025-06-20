@@ -23,6 +23,7 @@ load_dotenv()
 
 # Define allowed origins for CORS
 origins = [
+    "https://vegvision.onrender.com",
     "http://localhost:3000",
     "http://localhost:8080", 
 ]
