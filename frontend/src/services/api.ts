@@ -8,31 +8,29 @@ interface AnalysisResult {
   quantity?: string;
 }
 
-// This function adds CORS headers to our API requests to ensure cross-origin requests work
-const createCorsProxyUrl = (url: string): string => {
-  // Use a CORS proxy to bypass CORS restrictions in development
-  return `https://cors-anywhere.herokuapp.com/${url}`;
-};
+// ✅ Render backend base URL from env
+const BASE_URL = import.meta.env.VITE_API_URL;
 
+// ✅ Check fallback only in development
+const isDev = import.meta.env.DEV;
+
+// ------------------------
+// 🟢 Analyze Image Upload
+// ------------------------
 export async function analyzeImage(file: File): Promise<AnalysisResult> {
   try {
     const formData = new FormData();
     formData.append('file', file);
 
-    // Add CORS headers and proper content type
-    const response = await fetch('http://localhost:8000/analyze/upload', {
+    const response = await fetch(`${BASE_URL}/analyze/upload`, {
       method: 'POST',
       body: formData,
       headers: {
         'Accept': 'application/json',
-      },
-      // Add mode and credentials for CORS
-      mode: 'cors',
-      credentials: 'same-origin',
+      }
     });
 
     if (!response.ok) {
-      console.error('API Error:', response.status, response.statusText);
       throw new Error(`API Error: ${response.status}`);
     }
 
@@ -40,28 +38,25 @@ export async function analyzeImage(file: File): Promise<AnalysisResult> {
     return data;
   } catch (error) {
     console.error('Error analyzing image:', error);
-    // Return mock data as fallback when API is unavailable
-    console.log('Using mock data as fallback');
-    return getMockAnalysisResult();
+    return isDev ? getMockAnalysisResult() : throwClientError();
   }
 }
 
+// ------------------------
+// 🟢 Analyze by Image URL
+// ------------------------
 export async function analyzeImageUrl(imageUrl: string): Promise<AnalysisResult> {
   try {
-    const response = await fetch('http://localhost:8000/analyze/url', {
+    const response = await fetch(`${BASE_URL}/analyze/url`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
       body: JSON.stringify({ image_url: imageUrl }),
-      // Add mode and credentials for CORS
-      mode: 'cors',
-      credentials: 'same-origin',
     });
 
     if (!response.ok) {
-      console.error('API Error:', response.status, response.statusText);
       throw new Error(`API Error: ${response.status}`);
     }
 
@@ -69,25 +64,22 @@ export async function analyzeImageUrl(imageUrl: string): Promise<AnalysisResult>
     return data;
   } catch (error) {
     console.error('Error analyzing image URL:', error);
-    // Return mock data as fallback when API is unavailable
-    console.log('Using mock data as fallback');
-    return getMockAnalysisResult();
+    return isDev ? getMockAnalysisResult() : throwClientError();
   }
 }
 
+// ------------------------
+// 🟢 Get Product Price
+// ------------------------
 export async function getProductPrice(productName: string): Promise<{ price: string; quantity: string }> {
   try {
-    const response = await fetch(`http://localhost:8000/price/${encodeURIComponent(productName)}`, {
+    const response = await fetch(`${BASE_URL}/price/${encodeURIComponent(productName)}`, {
       headers: {
         'Accept': 'application/json',
-      },
-      // Add mode and credentials for CORS
-      mode: 'cors',
-      credentials: 'same-origin',
+      }
     });
 
     if (!response.ok) {
-      console.error('API Error:', response.status, response.statusText);
       throw new Error(`API Error: ${response.status}`);
     }
 
@@ -98,24 +90,23 @@ export async function getProductPrice(productName: string): Promise<{ price: str
     };
   } catch (error) {
     console.error('Error getting product price:', error);
-    // Return mock data as fallback when API is unavailable
-    return {
-      price: "₹110",
-      quantity: "1 kg"
-    };
+    return isDev
+      ? { price: "₹110", quantity: "1 kg" }
+      : throwClientError();
   }
 }
 
-// This function provides mock data when the API is unavailable
+// ------------------------
+// 🟡 Dev Mock Fallback
+// ------------------------
 function getMockAnalysisResult(): AnalysisResult {
-  // Generate a random fruit or vegetable
   const produceItems = [
     {
       name: "Apple",
       quality: 87,
       moisture: 74,
       size: "medium",
-      insight: "This apple appears to be a fresh, ripe specimen with excellent coloration and minimal blemishes. The skin has a healthy sheen, indicating good hydration levels. The size is typical for the variety, and there are no visible signs of bruising or damage.",
+      insight: "This apple appears to be a fresh, ripe specimen with excellent coloration and minimal blemishes.",
       price: "₹110",
       quantity: "1 kg"
     },
@@ -124,7 +115,7 @@ function getMockAnalysisResult(): AnalysisResult {
       quality: 92,
       moisture: 85,
       size: "large",
-      insight: "This tomato is at peak ripeness with a vibrant red color and smooth, firm skin. The texture appears excellent with no soft spots or blemishes. It exhibits ideal moisture content and has a well-formed shape characteristic of a premium tomato.",
+      insight: "This tomato is at peak ripeness with a vibrant red color and smooth, firm skin.",
       price: "₹80",
       quantity: "500 g"
     },
@@ -133,7 +124,7 @@ function getMockAnalysisResult(): AnalysisResult {
       quality: 78,
       moisture: 65,
       size: "medium",
-      insight: "This banana is ripe with a bright yellow peel showing minimal brown spots. The firmness appears good with no major bruising. The moisture content is appropriate for its ripeness stage, and the size is consistent with standard market bananas.",
+      insight: "This banana is ripe with a bright yellow peel showing minimal brown spots.",
       price: "₹60",
       quantity: "6 pcs"
     },
@@ -142,13 +133,17 @@ function getMockAnalysisResult(): AnalysisResult {
       quality: 90,
       moisture: 70,
       size: "medium",
-      insight: "This carrot displays excellent quality with a vibrant orange color and smooth skin. It has good firmness and appears very fresh with no signs of wilting. The moisture content is ideal, and the shape is straight and uniform.",
+      insight: "This carrot displays excellent quality with a vibrant orange color and smooth skin.",
       price: "₹50",
       quantity: "500 g"
     }
   ];
   
-  // Select a random produce item
   const randomIndex = Math.floor(Math.random() * produceItems.length);
   return produceItems[randomIndex];
+}
+
+// Optional: uniform way to throw clean error to client
+function throwClientError(): never {
+  throw new Error("Service temporarily unavailable. Please try again later.");
 }
