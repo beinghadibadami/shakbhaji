@@ -8,14 +8,14 @@ interface AnalysisResult {
   quantity?: string;
 }
 
-const url = import.meta.env.VITE_API_URL;
+// const url = import.meta.env.VITE_API_URL;
 
 // Upload image for analysis
 export async function analyzeImage(file: File): Promise<AnalysisResult> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(`${url}/analyze/upload`, {
+  const response = await fetch('shakbhaji.onrender.com/analyze/upload', {
     method: 'POST',
     body: formData,
     headers: {
@@ -33,7 +33,7 @@ export async function analyzeImage(file: File): Promise<AnalysisResult> {
 
 // Analyze image by URL
 export async function analyzeImageUrl(imageUrl: string): Promise<AnalysisResult> {
-  const response = await fetch(`${url}/analyze/url`, {
+  const response = await fetch('shakbhaji.onrender.com/analyze/url', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -52,7 +52,7 @@ export async function analyzeImageUrl(imageUrl: string): Promise<AnalysisResult>
 
 // Get price by product name
 export async function getProductPrice(productName: string): Promise<{ price: string; quantity: string }> {
-  const response = await fetch(`${url}/price/${encodeURIComponent(productName)}`, {
+  const response = await fetch(`shakbhaji.onrender.com/price/${encodeURIComponent(productName)}`, {
     headers: {
       'Accept': 'application/json',
     },
