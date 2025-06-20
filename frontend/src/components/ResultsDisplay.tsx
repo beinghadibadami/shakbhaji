@@ -140,7 +140,7 @@ Report generated on: ${new Date().toLocaleString()}
                 <h3 className="text-2xl font-semibold capitalize">{result.name}</h3>
                 {(result.price && result.quantity) && (
                   <div className="mt-1 flex items-center gap-2">
-                    <div className="text-accent-foreground bg-accent/10 px-2.5 py-0.5 rounded-full text-sm font-medium">
+                    <div className="text-accent-foreground bg-accent px-2.5 py-0.5 rounded-full text-sm font-medium">
                       {result.price} <span className="text-xs opacity-80">for {result.quantity}</span>
                     </div>
                   </div>
