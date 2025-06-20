@@ -9,7 +9,7 @@ interface AnalysisResult {
 }
 
 // ✅ Render backend base URL from env
-const BASE_URL = import.meta.env.VITE_API_URL;
+const BASE_URL = "shakbhaji.onrender.com";
 
 // ✅ Check fallback only in development
 const isDev = import.meta.env.DEV;
