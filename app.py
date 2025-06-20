@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from dotenv import load_dotenv
-
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 load_dotenv()
 
@@ -76,102 +76,102 @@ def download_image(url):
 
 # Updated scraper function using Playwright
 async def scrape_bigbasket(search_query):
+
     try:
-        # Launch Playwright properly for Windows
         playwright = await async_playwright().start()
         browser = await playwright.chromium.launch(
             headless=True,
             channel="chrome",
-            args=["--start-maximized"]
+            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
         )
+
         context = await browser.new_context(
             viewport={"width": 1366, "height": 768},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            locale="en-US",
         )
+
         page = await context.new_page()
-        
-        # 1. Navigate with robust waiting
+        page.set_default_timeout(60000)  # Set default timeout
+
         search_url = f"https://www.bigbasket.com/ps/?q={search_query.replace(' ', '+')}"
-        await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-        
-        # 2. Wait for container hierarchy
-        # await page.wait_for_selector("body #__next", state="attached", timeout=15000)
-        
-        # 3. Drill down through containers
-        container_selector = """
-            body #__next 
-            div.container.min-h-96 
-            div.col-span-12.mt-3.mb-8 
-            div.grid.grid-flow-col.gap-x-6.relative.mt-5.pb-5.border-t.border-dashed.border-silverSurfer-400 
-            section 
-            section.z-10
-        """
-        await page.wait_for_selector(container_selector, timeout=20000)
-        
-        # 4. Wait for product grid
-        ul_selector = f"{container_selector} ul.mt-5.grid.gap-6.grid-cols-9"
-        await page.wait_for_selector(ul_selector, state="visible", timeout=15000)
-        
-        # 5. Get first item
-        first_item = await page.query_selector(f"{ul_selector} li.PaginateItems___StyledLi-sc-1yrbjdr-0.dDBqny")
-        if not first_item:
-            return {"error": "Product grid not found"}
-        
-        await first_item.scroll_into_view_if_needed()
-        await page.wait_for_timeout(1000)
-        
-        # 6. Extract price
-        price = "N/A"
-        for selector in [
-            ".Label-sc-15v1nk5-0.Pricing___StyledLabel-sc-pldi2d-1.gJxZPQ.AypOi",
-            "span:has-text('₹')"
-        ]:
-            element = await first_item.query_selector(selector)
-            if element:
-                price = (await element.inner_text()).strip()
-                if "₹" in price:
-                    break
-        
-        # 7. Extract quantity
-        quantity = "N/A"
-        for selector in [
-            ".Label-sc-15v1nk5-0.PackChanger___StyledLabel-sc-newjpv-1.gJxZPQ.cWbtUx",
-            ".Label-sc-15v1nk5-0.gJxZPQ.truncate"
-        ]:
-            element = await first_item.query_selector(selector)
-            if element:
-                quantity = (await element.inner_text()).strip()
-                break
 
-        # Update MongoDB
-        if collection:
-            scraped_data = {
-                "name": search_query.capitalize(),
-                "quantity": quantity,
-                "price": price,
-                "scraped_at": datetime.utcnow(),
-                "source_url": search_url
-            }
+        for attempt in range(2):
             try:
-                await collection.update_one(
-                    {"name": search_query.capitalize()},
-                    {"$set": scraped_data},
-                    upsert=True
-                )
-            except Exception as db_error:
-                print(f"Database error: {db_error}")
+                print(f"🔎 Navigating to {search_url} (Attempt {attempt + 1})")
+                await page.goto(search_url, wait_until="networkidle", timeout=90000)
 
-        return {
-            "quantity": quantity,
-            "price": price,
-            "success": True
-        }
+                await page.screenshot(path="debug.png", full_page=True)
+                html_content = await page.content()
+                print(f"📄 HTML Snippet:\n{html_content[:1000]}")
+
+                # Simplified and reliable product grid selector
+                ul_selector = "ul.mt-5.grid.gap-6.grid-cols-9"
+                await page.wait_for_selector(ul_selector, timeout=45000)
+
+                first_item = await page.query_selector(f"{ul_selector} li")
+                if not first_item:
+                    return {"error": "Product grid not found", "success": False}
+
+                await first_item.scroll_into_view_if_needed()
+                await page.wait_for_timeout(1000)
+
+                # Extract price
+                price = "N/A"
+                for selector in [
+                    ".Label-sc-15v1nk5-0.Pricing___StyledLabel-sc-pldi2d-1.gJxZPQ.AypOi",
+                    "span:has-text('₹')"
+                ]:
+                    element = await first_item.query_selector(selector)
+                    if element:
+                        price = (await element.inner_text()).strip()
+                        if "₹" in price:
+                            break
+
+                # Extract quantity
+                quantity = "N/A"
+                for selector in [
+                    ".Label-sc-15v1nk5-0.PackChanger___StyledLabel-sc-newjpv-1.gJxZPQ.cWbtUx",
+                    ".Label-sc-15v1nk5-0.gJxZPQ.truncate"
+                ]:
+                    element = await first_item.query_selector(selector)
+                    if element:
+                        quantity = (await element.inner_text()).strip()
+                        break
+
+                # Cache to MongoDB
+                if collection:
+                    scraped_data = {
+                        "name": search_query.capitalize(),
+                        "quantity": quantity,
+                        "price": price,
+                        "scraped_at": datetime.utcnow(),
+                        "source_url": search_url
+                    }
+                    try:
+                        await collection.update_one(
+                            {"name": search_query.capitalize()},
+                            {"$set": scraped_data},
+                            upsert=True
+                        )
+                    except Exception as db_error:
+                        print(f"⚠️ MongoDB update failed: {db_error}")
+
+                return {
+                    "quantity": quantity,
+                    "price": price,
+                    "success": True
+                }
+
+            except PlaywrightTimeoutError as e:
+                print(f"⏱️ Attempt {attempt + 1} timed out: {e}")
+                if attempt == 1:
+                    return {"error": str(e), "success": False}
+                await page.wait_for_timeout(3000)
 
     except Exception as e:
-        return {
-            "error": str(e),
-            "success": False
-        }
+        return {"error": str(e), "success": False}
+
     finally:
         if 'page' in locals():
             await page.close()
@@ -181,6 +181,7 @@ async def scrape_bigbasket(search_query):
             await browser.close()
         if 'playwright' in locals():
             await playwright.stop()
+
 # Updated price fetching function
 async def get_product_price(product_name, force_refresh=False):
     """Get product price with caching"""
