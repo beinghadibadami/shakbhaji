@@ -146,4 +146,4 @@ export async function getProductPrice(productName: string): Promise<{ price: str
 // // Optional: uniform way to throw clean error to client
 // function throwClientError(): never {
 //   throw new Error("Service temporarily unavailable. Please try again later.");
-// }
+}
