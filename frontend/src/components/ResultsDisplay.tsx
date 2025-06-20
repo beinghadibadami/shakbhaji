@@ -14,6 +14,7 @@ interface AnalysisResult {
   insight: string;
   price?: string;
   quantity?: string;
+  error?:string;
 }
 
 interface ResultsDisplayProps {
@@ -27,6 +28,26 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, imageUrl, onRes
   
   if (!result) return null;
 
+  if (result.error) {
+  return (
+    <div className="animate-fade-in">
+      <Card className="neo-card text-red-600 text-center p-6 border border-red-300 bg-red-50">
+        <CardHeader>
+          <CardTitle>Error</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>{result.error}</p>
+          <div className="mt-4">
+            <Button variant="outline" onClick={onReset}>
+              Try Another Image
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+  
   const getQualityColor = (quality: number) => {
     if (quality >= 80) return 'bg-green-100 text-green-800';
     if (quality >= 60) return 'bg-lime-100 text-lime-800';
