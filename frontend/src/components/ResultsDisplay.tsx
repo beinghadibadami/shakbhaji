@@ -44,13 +44,12 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result, imageUrl, onRes
   };
 
   const getSizeIcon = (size: string) => {
-    switch (size.toLowerCase()) {
+    switch (size) {
       case 'small':
         return <div className="w-2 h-2 bg-gray-500 rounded-full"></div>;
       case 'medium':
         return <div className="w-3 h-3 bg-gray-600 rounded-full"></div>;
       case 'big':
-      case 'large':
         return <div className="w-4 h-4 bg-gray-700 rounded-full"></div>;
       default:
         return <div className="w-3 h-3 bg-gray-600 rounded-full"></div>;
