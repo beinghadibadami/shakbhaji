@@ -9,14 +9,15 @@ from io import BytesIO
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import uvicorn
-from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 from pymongo import MongoClient
 from datetime import datetime, timedelta
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from dotenv import load_dotenv
-from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 
 load_dotenv()
 
@@ -76,112 +77,115 @@ def download_image(url):
 
 # Updated scraper function using Playwright
 async def scrape_bigbasket(search_query):
-
     try:
-        playwright = await async_playwright().start()
-        browser = await playwright.chromium.launch(
-            headless=True,
-            channel="chrome",
-            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
-        )
+        def sync_scrape():
+            options = Options()
+            options.add_argument("--headless")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--window-size=1366,768")
+            options.add_argument(
+                "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            )
 
-        context = await browser.new_context(
-            viewport={"width": 1366, "height": 768},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            locale="en-US",
-        )
-
-        page = await context.new_page()
-        page.set_default_timeout(10000)  # Set default timeout
-
-        search_url = f"https://www.bigbasket.com/ps/?q={search_query.replace(' ', '+')}"
-
-        for attempt in range(2):
+            driver = webdriver.Chrome(options=options)
             try:
-                print(f"🔎 Navigating to {search_url} (Attempt {attempt + 1})")
-                await page.goto(search_url, wait_until="networkidle", timeout=3000)
+                search_url = f"https://www.bigbasket.com/ps/?q={search_query.replace(' ', '+')}"
+                driver.get(search_url)
 
-                await page.screenshot(path="debug.png", full_page=True)
-                html_content = await page.content()
-                print(f"📄 HTML Snippet:\n{html_content[:1000]}")
+                driver.implicitly_wait(10)
 
-                # Simplified and reliable product grid selector
+                # Wait for #__next to attach
+                driver.find_element(By.CSS_SELECTOR, "body #__next")
+
+                # Parse with BeautifulSoup
+                soup = BeautifulSoup(driver.page_source, "html.parser")
+
+                # 3. Navigate through containers (CSS path left unchanged)
+                container = soup.select_one("""
+                    body #__next 
+                    div.container.min-h-96 
+                    div.col-span-12.mt-3.mb-8 
+                    div.grid.grid-flow-col.gap-x-6.relative.mt-5.pb-5.border-t.border-dashed.border-silverSurfer-400 
+                    section 
+                    section.z-10
+                """)
+
+                if not container:
+                    return {"error": "Container not found", "success": False}
+
+                # 4. Locate product grid
                 ul_selector = "ul.mt-5.grid.gap-6.grid-cols-9"
-                await page.wait_for_selector(ul_selector, timeout=5000)
+                ul = container.select_one(ul_selector)
 
-                first_item = await page.query_selector(f"{ul_selector} li")
-                if not first_item:
+                if not ul:
                     return {"error": "Product grid not found", "success": False}
 
-                await first_item.scroll_into_view_if_needed()
-                await page.wait_for_timeout(1000)
+                # 5. First item
+                first_item = ul.select_one("li.PaginateItems___StyledLi-sc-1yrbjdr-0.dDBqny")
+                if not first_item:
+                    return {"error": "Product item not found", "success": False}
 
-                # Extract price
+                # 6. Extract price
                 price = "N/A"
                 for selector in [
                     ".Label-sc-15v1nk5-0.Pricing___StyledLabel-sc-pldi2d-1.gJxZPQ.AypOi",
-                    "span:has-text('₹')"
+                    "span"
                 ]:
-                    element = await first_item.query_selector(selector)
-                    if element:
-                        price = (await element.inner_text()).strip()
-                        if "₹" in price:
-                            break
+                    el = first_item.select_one(selector)
+                    if el and "₹" in el.get_text():
+                        price = el.get_text(strip=True)
+                        break
 
-                # Extract quantity
+                # 7. Extract quantity
                 quantity = "N/A"
                 for selector in [
                     ".Label-sc-15v1nk5-0.PackChanger___StyledLabel-sc-newjpv-1.gJxZPQ.cWbtUx",
                     ".Label-sc-15v1nk5-0.gJxZPQ.truncate"
                 ]:
-                    element = await first_item.query_selector(selector)
-                    if element:
-                        quantity = (await element.inner_text()).strip()
+                    el = first_item.select_one(selector)
+                    if el:
+                        quantity = el.get_text(strip=True)
                         break
-
-                # Cache to MongoDB
-                if collection:
-                    scraped_data = {
-                        "name": search_query.capitalize(),
-                        "quantity": quantity,
-                        "price": price,
-                        "scraped_at": datetime.utcnow(),
-                        "source_url": search_url
-                    }
-                    try:
-                        await collection.update_one(
-                            {"name": search_query.capitalize()},
-                            {"$set": scraped_data},
-                            upsert=True
-                        )
-                    except Exception as db_error:
-                        print(f"⚠️ MongoDB update failed: {db_error}")
 
                 return {
                     "quantity": quantity,
                     "price": price,
-                    "success": True
+                    "success": True,
+                    "search_url": search_url
                 }
 
-            except PlaywrightTimeoutError as e:
-                print(f"⏱️ Attempt {attempt + 1} timed out: {e}")
-                if attempt == 1:
-                    return {"error": str(e), "success": False}
-                await page.wait_for_timeout(3000)
+            finally:
+                driver.quit()
+
+        # Run the synchronous Selenium + BS4 code in a background thread
+        result = await asyncio.to_thread(sync_scrape)
+
+        # MongoDB update (unchanged)
+        if result.get("success") and collection is not None:
+            scraped_data = {
+                "name": search_query.capitalize(),
+                "quantity": result["quantity"],
+                "price": result["price"],
+                "scraped_at": datetime.utcnow(),
+                "source_url": result["search_url"]
+            }
+            try:
+                collection.update_one(
+                    {"name": search_query.capitalize()},
+                    {"$set": scraped_data},
+                    upsert=True
+                )
+            except Exception as db_error:
+                print(f"Database error: {db_error}")
+
+        return result
 
     except Exception as e:
-        return {"error": str(e), "success": False}
-
-    finally:
-        if 'page' in locals():
-            await page.close()
-        if 'context' in locals():
-            await context.close()
-        if 'browser' in locals():
-            await browser.close()
-        if 'playwright' in locals():
-            await playwright.stop()
-
+        return {
+            "error": str(e),
+            "success": False
+        }
 # Updated price fetching function
 async def get_product_price(product_name, force_refresh=False):
     """Get product price with caching"""
