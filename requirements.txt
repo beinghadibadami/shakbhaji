@@ -3,7 +3,9 @@ uvicorn[standard]
 groq
 requests
 pydantic
-selenium
+aiohttp
+Brotli
+Pillow
 beautifulsoup4
 pymongo
 python-dotenv
