@@ -15,17 +15,16 @@ from datetime import datetime, timedelta
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from dotenv import load_dotenv
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
+import aiohttp
+from urllib.parse import quote_plus
 
 load_dotenv()
 
 # Define allowed origins for CORS
 origins = [
     "https://vegvision.onrender.com",
-    # "http://localhost:3000",
-    # "http://localhost:8080", 
+    "http://localhost:3000",
+    "http://localhost:8080", 
     "https://shakbhaji.onrender.com"
 ]
 
@@ -77,93 +76,121 @@ def download_image(url):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to download image: {str(e)}")
 
-# Updated scraper function using Playwright
-async def scrape_bigbasket(search_query):
+# Updated scraper function faster (v-2.0)
+def parse_bigbasket_html(html, search_query, search_url):
+    """Parse BigBasket HTML response"""
     try:
-        def sync_scrape():
-            options = Options()
-            options.add_argument("--headless")
-            options.add_argument("--no-sandbox")
-            options.add_argument("--disable-dev-shm-usage")
-            options.add_argument("--window-size=1366,768")
-            options.add_argument(
-                "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-            )
+        soup = BeautifulSoup(html, "html.parser")
+        
+        # Your existing parsing logic
+        container = soup.select_one("""
+            body #__next 
+            div.container.min-h-96 
+            div.col-span-12.mt-3.mb-8 
+            div.grid.grid-flow-col.gap-x-6.relative.mt-5.pb-5.border-t.border-dashed.border-silverSurfer-400 
+            section 
+            section.z-10
+        """)
 
-            driver = webdriver.Chrome(options=options)
-            try:
-                search_url = f"https://www.bigbasket.com/ps/?q={search_query.replace(' ', '+')}"
-                driver.get(search_url)
+        if not container:
+            return {"error": "Container not found", "success": False}
 
-                driver.implicitly_wait(10)
+        ul_selector = "ul.mt-5.grid.gap-6.grid-cols-9"
+        ul = container.select_one(ul_selector)
 
-                # Wait for #__next to attach
-                driver.find_element(By.CSS_SELECTOR, "body #__next")
+        if not ul:
+            return {"error": "Product grid not found", "success": False}
 
-                # Parse with BeautifulSoup
-                soup = BeautifulSoup(driver.page_source, "html.parser")
+        first_item = ul.select_one("li.PaginateItems___StyledLi-sc-1yrbjdr-0.dDBqny")
+        if not first_item:
+            return {"error": "Product item not found", "success": False}
 
-                # 3. Navigate through containers (CSS path left unchanged)
-                container = soup.select_one("""
-                    body #__next 
-                    div.container.min-h-96 
-                    div.col-span-12.mt-3.mb-8 
-                    div.grid.grid-flow-col.gap-x-6.relative.mt-5.pb-5.border-t.border-dashed.border-silverSurfer-400 
-                    section 
-                    section.z-10
-                """)
+        # Extract price
+        price = "N/A"
+        for selector in [
+            ".Label-sc-15v1nk5-0.Pricing___StyledLabel-sc-pldi2d-1.gJxZPQ.AypOi",
+            "span"
+        ]:
+            el = first_item.select_one(selector)
+            if el and "₹" in el.get_text():
+                price = el.get_text(strip=True)
+                break
 
-                if not container:
-                    return {"error": "Container not found", "success": False}
+        # Extract quantity
+        quantity = "N/A"
+        for selector in [
+            ".Label-sc-15v1nk5-0.PackChanger___StyledLabel-sc-newjpv-1.gJxZPQ.cWbtUx",
+            ".Label-sc-15v1nk5-0.gJxZPQ.truncate"
+        ]:
+            el = first_item.select_one(selector)
+            if el:
+                quantity = el.get_text(strip=True)
+                break
 
-                # 4. Locate product grid
-                ul_selector = "ul.mt-5.grid.gap-6.grid-cols-9"
-                ul = container.select_one(ul_selector)
+        return {
+            "quantity": quantity,
+            "price": price,
+            "success": True,
+            "search_url": search_url
+        }
+        
+    except Exception as e:
+        return {"error": f"Parsing error: {str(e)}", "success": False}
 
-                if not ul:
-                    return {"error": "Product grid not found", "success": False}
+async def fallback_scrape_requests(search_query):
+    """Fallback using requests library if aiohttp fails"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        
+        search_url = f"https://www.bigbasket.com/ps/?q={quote_plus(search_query)}"
+        
+        # Run requests.get in thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None, 
+            lambda: requests.get(search_url, headers=headers, timeout=8)
+        )
+        
+        if response.status_code == 200:
+            return parse_bigbasket_html(response.text, search_query, search_url)
+        else:
+            return {"error": f"HTTP {response.status_code}", "success": False}
+            
+    except Exception as e:
+        return {"error": f"Fallback scrape failed: {str(e)}", "success": False}
 
-                # 5. First item
-                first_item = ul.select_one("li.PaginateItems___StyledLi-sc-1yrbjdr-0.dDBqny")
-                if not first_item:
-                    return {"error": "Product item not found", "success": False}
+# Fast scraper function using aiohttp
+async def scrape_bigbasket(search_query):
+    """Fast scraping function using aiohttp - replaces Selenium version"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+        }
 
-                # 6. Extract price
-                price = "N/A"
-                for selector in [
-                    ".Label-sc-15v1nk5-0.Pricing___StyledLabel-sc-pldi2d-1.gJxZPQ.AypOi",
-                    "span"
-                ]:
-                    el = first_item.select_one(selector)
-                    if el and "₹" in el.get_text():
-                        price = el.get_text(strip=True)
-                        break
+        encoded_query = quote_plus(search_query)
+        search_url = f"https://www.bigbasket.com/ps/?q={encoded_query}"
+        timeout = aiohttp.ClientTimeout(total=8, connect=3)
 
-                # 7. Extract quantity
-                quantity = "N/A"
-                for selector in [
-                    ".Label-sc-15v1nk5-0.PackChanger___StyledLabel-sc-newjpv-1.gJxZPQ.cWbtUx",
-                    ".Label-sc-15v1nk5-0.gJxZPQ.truncate"
-                ]:
-                    el = first_item.select_one(selector)
-                    if el:
-                        quantity = el.get_text(strip=True)
-                        break
-
-                return {
-                    "quantity": quantity,
-                    "price": price,
-                    "success": True,
-                    "search_url": search_url
-                }
-
-            finally:
-                driver.quit()
-
-        # Run the synchronous Selenium + BS4 code in a background thread
-        result = await asyncio.to_thread(sync_scrape)
-
-        # MongoDB update (unchanged)
+        try:
+            async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
+                async with session.get(search_url) as response:
+                    if response.status == 200:
+                        html = await response.text()
+                        result = parse_bigbasket_html(html, search_query, search_url)
+                    else:
+                        result = {"error": f"HTTP {response.status}", "success": False}
+        except Exception as aiohttp_error:
+            print(f"aiohttp failed, trying fallback: {aiohttp_error}")
+            # Fallback to requests if aiohttp fails
+            result = await fallback_scrape_requests(search_query)
+        
+        # MongoDB update (keep existing logic intact)
         if result.get("success") and collection is not None:
             scraped_data = {
                 "name": search_query.capitalize(),
@@ -188,7 +215,8 @@ async def scrape_bigbasket(search_query):
             "error": str(e),
             "success": False
         }
-# Updated price fetching function
+
+# Updated price fetching function (keep existing logic)
 async def get_product_price(product_name, force_refresh=False):
     """Get product price with caching"""
     product_name_normalized = product_name.lower()
@@ -209,6 +237,7 @@ async def get_product_price(product_name, force_refresh=False):
     
     # Scrape new data
     return await scrape_bigbasket(product_name_normalized)
+
 
 # Main analysis function
 async def analyze_image(image_data, force_refresh=False):
@@ -315,6 +344,7 @@ async def root():
     return {
         "message": "Fruit and Vegetable Analysis API",
         "status": "running",
+        "version": "2.0.0 - Fast Scraper",
         "endpoints": {
             "analyze_upload": "/analyze/upload - Upload an image for complete analysis including price",
             "analyze_url": "/analyze/url - Provide an image URL for complete analysis including price",
