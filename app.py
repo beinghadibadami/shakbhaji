@@ -287,7 +287,7 @@ async def analyze_image(image_data, force_refresh=False):
         )
         
         # Parse the analysis result
-        analysis_result = json.loads(completion.choices[0].message)
+        analysis_result = json.loads(completion.choices[0].message.content)
         
         # Fetch price information if it's a fruit or vegetable
         if "name" in analysis_result and analysis_result["name"] not in ["not a fruit or vegetable", "unknown"]:
